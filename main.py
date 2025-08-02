@@ -1,20 +1,18 @@
-from langchain_community.document_loaders import PyPDFLoader
-from langchain_openai import OpenAIEmbeddings
-from langchain_qdrant import QdrantVectorStore
-from langchain_text_splitters import RecursiveCharacterTextSplitter
-from dotenv import load_dotenv
+import os
+from utils import load_pdf, split_documents, get_embedding_model, store_embeddings
 
-load_dotenv()
+file_path = os.getenv("PDF_FILE")
+chunk_size = int(os.getenv("CHUNK_SIZE", "1000"))
+chunk_overlap = int(os.getenv("CHUNK_OVERLAP", "200"))
+vector_db_url = os.getenv("VECTOR_DB_URL")
+collection_name = os.getenv("COLLECTION_NAME")
 
-file_path = "/Users/adityapalpattuwar/Downloads/python-handbook.pdf"
-loader = PyPDFLoader(file_path)
+print("🔍 Loading PDF...")
+documents = load_pdf(file_path)
 
-documents = loader.load()
+print("✂️ Splitting into chunks...")
+texts = split_documents(documents, chunk_size, chunk_overlap)
 
-text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
-texts = text_splitter.split_documents(documents)
-
-#Vector embeddings
-embedding_model = OpenAIEmbeddings(model="text-embedding-3-small")
-
-vector_db = QdrantVectorStore.from_documents(documents=texts, embedding=embedding_model, url="http://localhost:6333", collection_name="test_collection")
+print(f"🧠 Creating embeddings and storing to Qdrant collection: {collection_name}")
+embedding_model = get_embedding_model()
+store_embeddings(texts, embedding_model, collection_name, vector_db_url)
