@@ -1,7 +1,11 @@
 import os
+
+from langchain_openai import ChatOpenAI
 from utils import get_embedding_model, get_vector_store
 from openai import OpenAI
 from dotenv import load_dotenv
+from langchain.retrievers import ContextualCompressionRetriever
+from langchain.retrievers.document_compressors import LLMChainExtractor
 
 load_dotenv()
 
@@ -13,11 +17,23 @@ collection_name = os.getenv("COLLECTION_NAME")
 vector_db_url = os.getenv("VECTOR_DB_URL")
 
 vector_db = get_vector_store(embedding_model, collection_name, vector_db_url)
-results = vector_db.similarity_search(user_query, k=k)
+#results = vector_db.similarity_search(user_query, k=k)
+
+llm = ChatOpenAI(model="gpt-4.1", temperature=0)
+compressor = LLMChainExtractor.from_llm(llm=llm)
+
+compression_retriever = ContextualCompressionRetriever(
+    base_compressor=compressor,
+    base_retriever=vector_db.as_retriever()
+)
+
+compressed_docs = compression_retriever.invoke(
+    user_query
+)
 
 context = "\n\n".join([
     f"[Page {r.metadata['page_label']}]: {r.page_content.strip()}"
-    for r in results
+    for r in compressed_docs
 ])
 
 SYSTEM_PROMPT = f"""You are an assistant that answers based only on the provided context from a Python Handbook.
